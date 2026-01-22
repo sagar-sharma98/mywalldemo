@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,48 +10,64 @@ import {
   Platform,
   ScrollView,
 } from "react-native";
+import { useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
+import { setOnBoardingDetails } from "../../../store/slices/onBoardingSlice";
 import { SvgUri } from "react-native-svg";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function OtpScreen({ route }) {
   const { phone } = route.params || {};
-  const inputRefs = useRef([]);
+  const [loading, setIsLoading] = useState(false);
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
 
-  const handleVerifyOtp = () => {
-    const enteredOtp = otp.join("");
+  const inputRefs = useRef([]);
+  const scrollRef = useRef(null);
+  const otpSectionRef = useRef(null);
 
-    if (enteredOtp.length < 6) {
-      Alert.alert("Error", "Please enter complete OTP");
+  const dispatch = useDispatch();
+
+  // otp verification
+  const handleVerifyOtp = useCallback(async () => {
+    if (!otp) {
       return;
     }
 
-    setLoading(true);
+    setIsLoading(true);
+    try {
+      const result = await confirmSignIn({
+        challengeResponse: otp,
+      });
 
-    // 🔹 Frontend OTP check (mock)
-    setTimeout(() => {
-      setLoading(false);
+      if (result?.isSignedIn || result?.signInStep === "DONE") {
+        // Store user details in onboarding slice
+        dispatch(
+          setOnBoardingDetails({
+            phone: phone,
+          }),
+        );
 
-      if (enteredOtp !== EXPECTED_OTP) {
-        Alert.alert("Invalid OTP", "Please enter the correct OTP");
-        return;
+        // navigation to the main screen
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "Main" }],
+        });
+      } else {
+        setOtpError("Invalid OTP. Please try again.");
       }
+    } catch (error) {
+      console.error("Error:", error);
 
-      // ✅ Save user data in Redux
-      dispatch(
-        setUserDetails({
-          phone,
-          name: null, // you can update later
-        }),
-      );
-
-      Alert.alert("Success", "OTP verified successfully");
-
-      // 🔜 Navigate to next screen later
-      // navigation.replace("Home");
-    }, 800);
-  };
+      if (error.name === "InvalidLambdaResponseException") {
+        setOtpError("Maximum attempts reached. Please try again later.");
+      } else {
+        setOtpError(error.message || "Invalid OTP. Please try again.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [otp, dispatch]);
 
   const handleOtpChange = (value, index) => {
     const newOtp = [...otp];
@@ -63,6 +79,32 @@ export default function OtpScreen({ route }) {
     }
   };
 
+  useEffect(() => {
+    const showSub = Keyboard.addListener("keyboardDidShow", () => {
+      setTimeout(() => {
+        otpSectionRef.current?.measureLayout(
+          scrollRef.current,
+          (x, y) => {
+            scrollRef.current?.scrollTo({
+              y: y - 80,
+              animated: true,
+            });
+          },
+          () => {},
+        );
+      }, 50);
+    });
+
+    const hideSub = Keyboard.addListener("keyboardDidHide", () => {
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
@@ -71,6 +113,7 @@ export default function OtpScreen({ route }) {
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 40}
       >
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={{ flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -93,7 +136,7 @@ export default function OtpScreen({ route }) {
             </View>
 
             {/* OTP CARD */}
-            <View style={styles.otpCard}>
+            <View style={styles.otpCard} ref={otpSectionRef}>
               <SvgUri
                 uri="https://mywall.me/assets/svg/myWallTop.svg"
                 width={100}

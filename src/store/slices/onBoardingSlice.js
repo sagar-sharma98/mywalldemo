@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createSlice } from "@reduxjs/toolkit";
 
 const initialState = {
   details: {
@@ -14,11 +14,11 @@ const onBoardingSlice = createSlice({
   initialState,
   reducers: {
     setOnBoardingDetails: (state, action) => {
-      state.onBoarding = action.payload;
+      state.details = action.payload;
     },
   },
 });
 
-export default onBoardingSlice.reducer;
-
 export const { setOnBoardingDetails } = onBoardingSlice.actions;
+
+export default onBoardingSlice.reducer;

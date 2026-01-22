@@ -5,7 +5,7 @@ export const store = configureStore({
   reducer: {
     onBoarding: onBoardingReducer,
   },
-  middleware: getDefaultMiddleware =>
+  middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: false,
     }),

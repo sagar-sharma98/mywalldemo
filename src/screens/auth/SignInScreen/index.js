@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,48 +8,65 @@ import {
   Alert,
 } from "react-native";
 import { SvgUri } from "react-native-svg";
-import { Auth } from "aws-amplify";
+import { signIn, signUp, signOut } from "aws-amplify/auth";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { generateTempPassword } from "../../../utility/helper";
 
 export default function SignInScreen({ navigation }) {
   const [phone, setPhone] = useState("+91");
+  const [loading, setLoading] = useState(false);
 
-  const handleSendOtp = async () => {
+  const handleSendOtp = useCallback(async () => {
+    if (phone.length !== 13) {
+      Alert.alert("Invalid number", "Enter a valid WhatsApp number");
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      if (phone.length < 13) {
-        Alert.alert("Invalid number", "Enter a valid phone number");
-        return;
+      // 👇 Force logout if already logged in
+      try {
+        await signOut({ global: true });
+      } catch (e) {
+        // ignore if not logged in
       }
 
-      // existing user login
-      await Auth.signIn(phone);
-      navigation.navigate("Otp", { phone });
-    } catch (error) {
-      // user does not exist
-      if (error.code === "UserNotFoundException") {
-        try {
-          await Auth.signUp({
-            username: phone,
-            password: Math.random().toString(36) + "Aa1!",
-            attributes: {
+      // Try signup first (for new users)
+      try {
+        await signUp({
+          username: phone,
+          password: generateTempPassword(),
+          options: {
+            userAttributes: {
               phone_number: phone,
             },
-          });
-
-          navigation.navigate("Otp", { phone });
-        } catch (signupError) {
-          Alert.alert("Signup Error", signupError.message);
-        }
-      } else {
-        Alert.alert("Error", error.message);
+          },
+        });
+      } catch (signupError) {
+        // Ignore if user already exists
       }
-    }
-  };
 
-  const continueHandler = () => {
-    navigation.navigate("Otp", { phone });
-  };
+      // 👇 This will ALWAYS trigger OTP now
+      const result = await signIn({
+        username: phone,
+        options: {
+          authFlowType: "CUSTOM_WITHOUT_SRP",
+        },
+      });
+
+      if (
+        result?.nextStep?.signInStep === "CONFIRM_SIGN_IN_WITH_CUSTOM_CHALLENGE"
+      ) {
+        navigation.navigate("Otp", { phone });
+      }
+    } catch (error) {
+      Alert.alert("Error", error.message || "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }, [phone, navigation]);
 
   return (
     <SafeAreaView style={styles.safeArea}>

@@ -1,12 +1,7 @@
 import { createSlice } from "@reduxjs/toolkit";
 
 const initialState = {
-  details: {
-    name: null,
-    phone: null,
-  },
-  loading: false,
-  error: null,
+  user: null,
 };
 
 const onBoardingSlice = createSlice({
@@ -14,11 +9,15 @@ const onBoardingSlice = createSlice({
   initialState,
   reducers: {
     setOnBoardingDetails: (state, action) => {
-      state.details = action.payload;
+      state.user = action.payload;
+    },
+    clearOnBoarding: (state) => {
+      state.user = null;
     },
   },
 });
 
-export const { setOnBoardingDetails } = onBoardingSlice.actions;
+export const { setOnBoardingDetails, clearOnBoarding } =
+  onBoardingSlice.actions;
 
 export default onBoardingSlice.reducer;

@@ -1,5 +1,5 @@
 import { configureStore } from "@reduxjs/toolkit";
-import onBoardingReducer from "./slices/onBoardingSlice";
+import onBoardingReducer from "./slice/onBoarding";
 
 export const store = configureStore({
   reducer: {

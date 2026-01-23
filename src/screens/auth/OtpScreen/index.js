@@ -7,19 +7,28 @@ import {
   TouchableOpacity,
   Image,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   ScrollView,
 } from "react-native";
 import { useSelector } from "react-redux";
 import { useDispatch } from "react-redux";
-import { setOnBoardingDetails } from "../../../store/slices/onBoardingSlice";
+import {
+  confirmSignIn,
+  getCurrentUser,
+  signIn,
+  signUp,
+} from "aws-amplify/auth";
+import { setOnBoardingDetails } from "../../../store/slice/onBoarding";
 import { SvgUri } from "react-native-svg";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
 
 export default function OtpScreen({ route }) {
   const { phone } = route.params || {};
   const [loading, setIsLoading] = useState(false);
+  const [otpError, setOtpError] = useState("");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
 
   const inputRefs = useRef([]);
@@ -27,47 +36,49 @@ export default function OtpScreen({ route }) {
   const otpSectionRef = useRef(null);
 
   const dispatch = useDispatch();
+  const navigation = useNavigation();
 
   // otp verification
-  const handleVerifyOtp = useCallback(async () => {
-    if (!otp) {
-      return;
-    }
+const handleVerifyOtp = useCallback(async () => {
+  if (!otp) return;
 
-    setIsLoading(true);
-    try {
-      const result = await confirmSignIn({
-        challengeResponse: otp,
+  setIsLoading(true);
+  try {
+    const result = await confirmSignIn({
+      challengeResponse: otp.join(""),
+    });
+
+    if (result?.isSignedIn) {
+      // 🔑 Fetch authenticated user AFTER sign-in is complete
+      const user = await getCurrentUser();
+
+      dispatch(setOnBoardingDetails(user));
+
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "main" }],
       });
-
-      if (result?.isSignedIn || result?.signInStep === "DONE") {
-        // Store user details in onboarding slice
-        dispatch(
-          setOnBoardingDetails({
-            phone: phone,
-          }),
-        );
-
-        // navigation to the main screen
-        navigation.reset({
-          index: 0,
-          routes: [{ name: "Main" }],
-        });
-      } else {
-        setOtpError("Invalid OTP. Please try again.");
-      }
-    } catch (error) {
-      console.error("Error:", error);
-
-      if (error.name === "InvalidLambdaResponseException") {
-        setOtpError("Maximum attempts reached. Please try again later.");
-      } else {
-        setOtpError(error.message || "Invalid OTP. Please try again.");
-      }
-    } finally {
-      setIsLoading(false);
+    } else {
+      setOtpError("Invalid OTP. Please try again.");
     }
-  }, [otp, dispatch]);
+  } catch (error) {
+    console.error("OTP Error:", error);
+
+    if (
+      error.name === "SignInException" ||
+      error.message?.includes("signIn was not called")
+    ) {
+      setOtpError("Session expired. Please request OTP again.");
+    } else if (error.name === "InvalidLambdaResponseException") {
+      setOtpError("Maximum attempts reached. Please try again later.");
+    } else {
+      setOtpError(error.message || "Invalid OTP. Please try again.");
+    }
+  } finally {
+    setIsLoading(false);
+  }
+}, [otp, dispatch]);
+
 
   const handleOtpChange = (value, index) => {
     const newOtp = [...otp];

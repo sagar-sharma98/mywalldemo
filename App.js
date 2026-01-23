@@ -9,11 +9,12 @@ import store from "./src/store/store";
 Amplify.configure(awsmobile);
 
 export default function App() {
+  console.log(awsmobile);
   return (
     <Provider store={store}>
-    <NavigationContainer>
-      <AppContainer />
-    </NavigationContainer>
+      <NavigationContainer>
+        <AppContainer />
+      </NavigationContainer>
     </Provider>
   );
 }

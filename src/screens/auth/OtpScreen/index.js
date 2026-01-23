@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Image,
   KeyboardAvoidingView,
-  Keyboard,
   Platform,
   ScrollView,
 } from "react-native";
@@ -19,7 +18,10 @@ import {
   signIn,
   signUp,
 } from "aws-amplify/auth";
-import { setOnBoardingDetails } from "../../../store/slice/onBoarding";
+import {
+  setOnBoardingDetails,
+  fetchInfluencerById,
+} from "../../../store/slice/onBoarding";
 import { SvgUri } from "react-native-svg";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -31,100 +33,92 @@ export default function OtpScreen({ route }) {
   const [otpError, setOtpError] = useState("");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
 
+  const authUser = useSelector(state => state.auth.user)
+
   const inputRefs = useRef([]);
-  const scrollRef = useRef(null);
-  const otpSectionRef = useRef(null);
 
   const dispatch = useDispatch();
   const navigation = useNavigation();
 
   // otp verification
-const handleVerifyOtp = useCallback(async () => {
-  if (!otp) return;
+  const handleVerifyOtp = useCallback(async () => {
+    if (!otp) return;
 
-  setIsLoading(true);
-  try {
-    const result = await confirmSignIn({
-      challengeResponse: otp.join(""),
-    });
-
-    if (result?.isSignedIn) {
-      // 🔑 Fetch authenticated user AFTER sign-in is complete
-      const user = await getCurrentUser();
-
-      dispatch(setOnBoardingDetails(user));
-
-      navigation.reset({
-        index: 0,
-        routes: [{ name: "main" }],
+    setIsLoading(true);
+    try {
+      const result = await confirmSignIn({
+         user: authUser,
+        challengeResponse: otp.join(""),
       });
-    } else {
-      setOtpError("Invalid OTP. Please try again.");
-    }
-  } catch (error) {
-    console.error("OTP Error:", error);
 
-    if (
-      error.name === "SignInException" ||
-      error.message?.includes("signIn was not called")
-    ) {
-      setOtpError("Session expired. Please request OTP again.");
-    } else if (error.name === "InvalidLambdaResponseException") {
-      setOtpError("Maximum attempts reached. Please try again later.");
-    } else {
-      setOtpError(error.message || "Invalid OTP. Please try again.");
-    }
-  } finally {
-    setIsLoading(false);
-  }
-}, [otp, dispatch]);
+      if (result?.isSignedIn) {
+        // 🔑 Fetch authenticated user AFTER sign-in is complete
+        const loggedInUser = await getCurrentUser();
 
+        dispatch(setOnBoardingDetails(loggedInUser));
+        await dispatch(
+          fetchInfluencerById(
+            `${loggedInUser?.username}::${loggedInUser?.username}`,
+          ),
+        );
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "main" }],
+        });
+      } else {
+        setOtpError("Invalid OTP. Please try again.");
+      }
+    } catch (error) {
+      console.error("OTP Error:", error);
+
+      if (
+        error.name === "SignInException" ||
+        error.message?.includes("signIn was not called")
+      ) {
+        setOtpError("Session expired. Please request OTP again.");
+      } else if (error.name === "InvalidLambdaResponseException") {
+        setOtpError("Maximum attempts reached. Please try again later.");
+      } else {
+        setOtpError(error.message || "Invalid OTP. Please try again.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [otp, dispatch]);
 
   const handleOtpChange = (value, index) => {
     const newOtp = [...otp];
+
+    // If user clears input (backspace)
+    if (value === "") {
+      newOtp[index] = "";
+      setOtp(newOtp);
+
+      if (index > 0) {
+        inputRefs.current[index - 1]?.focus();
+      }
+      return;
+    }
+
+    // Allow only numbers
+    if (!/^\d$/.test(value)) return;
+
     newOtp[index] = value;
     setOtp(newOtp);
 
-    if (value && index < 5) {
+    if (index < otp.length - 1) {
       inputRefs.current[index + 1]?.focus();
     }
   };
-
-  useEffect(() => {
-    const showSub = Keyboard.addListener("keyboardDidShow", () => {
-      setTimeout(() => {
-        otpSectionRef.current?.measureLayout(
-          scrollRef.current,
-          (x, y) => {
-            scrollRef.current?.scrollTo({
-              y: y - 80,
-              animated: true,
-            });
-          },
-          () => {},
-        );
-      }, 50);
-    });
-
-    const hideSub = Keyboard.addListener("keyboardDidHide", () => {
-      scrollRef.current?.scrollTo({ y: 0, animated: true });
-    });
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 40}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
         <ScrollView
-          ref={scrollRef}
           contentContainerStyle={{ flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -147,7 +141,7 @@ const handleVerifyOtp = useCallback(async () => {
             </View>
 
             {/* OTP CARD */}
-            <View style={styles.otpCard} ref={otpSectionRef}>
+            <View style={styles.otpCard}>
               <SvgUri
                 uri="https://mywall.me/assets/svg/myWallTop.svg"
                 width={100}
@@ -181,7 +175,16 @@ const handleVerifyOtp = useCallback(async () => {
                     maxLength={1}
                     value={digit}
                     onChangeText={(value) => handleOtpChange(value, index)}
-                    returnKeyType="done"
+                    onKeyPress={({ nativeEvent }) => {
+                      if (
+                        nativeEvent.key === "Backspace" &&
+                        otp[index] === "" &&
+                        index > 0
+                      ) {
+                        inputRefs.current[index - 1]?.focus();
+                      }
+                    }}
+                    // returnKeyType="done"
                   />
                 ))}
               </View>
@@ -207,7 +210,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
 
   topImageWrapper: {
-    height: 300,
+    height: "48%",
     width: "100%",
     position: "relative",
     overflow: "hidden",
@@ -223,7 +226,7 @@ const styles = StyleSheet.create({
 
   otpCard: {
     backgroundColor: "#fff",
-    marginTop: -60,
+    marginTop: -50,
     borderTopLeftRadius: 60,
     borderTopRightRadius: 60,
     paddingHorizontal: 24,

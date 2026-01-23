@@ -6,16 +6,23 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from "react-native";
 import { SvgUri } from "react-native-svg";
 import { signIn, signUp, signOut } from "aws-amplify/auth";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { generateTempPassword } from "../../../utility/helper";
+import { setAuthUser } from "../../../store/slice/authSlice";
+import { useDispatch } from "react-redux";
 
 export default function SignInScreen({ navigation }) {
   const [phone, setPhone] = useState("+91");
   const [loading, setLoading] = useState(false);
+
+  const dispatch = useDispatch();
 
   const handleSendOtp = useCallback(async () => {
     if (phone.length !== 13) {
@@ -56,6 +63,8 @@ export default function SignInScreen({ navigation }) {
         },
       });
 
+      dispatch(setAuthUser(result));
+
       if (
         result?.nextStep?.signInStep === "CONFIRM_SIGN_IN_WITH_CUSTOM_CHALLENGE"
       ) {
@@ -70,72 +79,84 @@ export default function SignInScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        {/* TOP IMAGE SECTION */}
-        <View style={styles.topImageWrapper}>
-          <SvgUri
-            uri="https://mywall.me/assets/svg/signInPage.svg"
-            width="100%"
-            height="100%"
-            preserveAspectRatio="xMidYMid slice"
-            style={StyleSheet.absoluteFillObject}
-          />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+      >
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.container}>
+            {/* TOP IMAGE SECTION */}
+            <View style={styles.topImageWrapper}>
+              <SvgUri
+                uri="https://mywall.me/assets/svg/signInPage.svg"
+                width="100%"
+                height="100%"
+                preserveAspectRatio="xMidYMid slice"
+                style={StyleSheet.absoluteFillObject}
+              />
 
-          <LinearGradient
-            colors={["rgba(125, 52, 241, 0.05)", "rgba(4, 0, 14, 0.43)"]}
-            locations={[0.2212, 0.7596]}
-            style={styles.gradient}
-          />
-        </View>
-
-        {/* SIGN IN CONTENT */}
-        <View style={styles.signInCard}>
-          <SvgUri
-            uri="https://mywall.me/assets/svg/myWallTop.svg"
-            width={100}
-            height={44}
-          />
-
-          <Text style={styles.heading}>India's #1 Creator Lifestyle App</Text>
-          <Text style={styles.subHeading}>Sign Up or Log In</Text>
-
-          <View style={styles.inputWrapper}>
-            <Text style={styles.label}>Enter Your WhatsApp Number</Text>
-
-            <View style={styles.phoneInputContainer}>
-              <View style={styles.flagContainer}>
-                <SvgUri
-                  uri="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1ee-1f1f3.svg"
-                  width={24}
-                  height={24}
-                />
-              </View>
-
-              <TextInput
-                style={styles.phoneInput}
-                placeholder="Enter WhatsApp number"
-                placeholderTextColor="#999"
-                keyboardType="number-pad"
-                value={phone}
-                onChangeText={setPhone}
-                maxLength={13}
+              <LinearGradient
+                colors={["rgba(125, 52, 241, 0.05)", "rgba(4, 0, 14, 0.43)"]}
+                locations={[0.2212, 0.7596]}
+                style={styles.gradient}
               />
             </View>
 
-            <Text style={styles.infoText}>
-              We will send you a code to confirm your number
-            </Text>
+            {/* SIGN IN CONTENT */}
+            <View style={styles.signInCard}>
+              <SvgUri
+                uri="https://mywall.me/assets/svg/myWallTop.svg"
+                width={100}
+                height={44}
+              />
+
+              <Text style={styles.heading}>India's #1 Creator Lifestyle App</Text>
+              <Text style={styles.subHeading}>Sign Up or Log In</Text>
+
+              <View style={styles.inputWrapper}>
+                <Text style={styles.label}>Enter Your WhatsApp Number</Text>
+
+                <View style={styles.phoneInputContainer}>
+                  <View style={styles.flagContainer}>
+                    <SvgUri
+                      uri="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1ee-1f1f3.svg"
+                      width={24}
+                      height={24}
+                    />
+                  </View>
+
+                  <TextInput
+                    style={styles.phoneInput}
+                    placeholder="Enter WhatsApp number"
+                    placeholderTextColor="#999"
+                    keyboardType="number-pad"
+                    value={phone}
+                    onChangeText={setPhone}
+                    maxLength={13}
+                  />
+                </View>
+
+                <Text style={styles.infoText}>
+                  We will send you a code to confirm your number
+                </Text>
+              </View>
+
+              <TouchableOpacity style={styles.button} onPress={handleSendOtp}>
+                <Text style={styles.buttonText}>Continue</Text>
+              </TouchableOpacity>
+
+              <Text style={styles.footerText}>
+                By continuing, you agree to our T&amp;C
+              </Text>
+            </View>
           </View>
-
-          <TouchableOpacity style={styles.button} onPress={handleSendOtp}>
-            <Text style={styles.buttonText}>Continue</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.footerText}>
-            By continuing, you agree to our T&amp;C
-          </Text>
-        </View>
-      </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -152,7 +173,7 @@ const styles = StyleSheet.create({
   },
 
   topImageWrapper: {
-    height: "48%",
+    height: "50%",
     width: "100%",
     position: "relative",
     overflow: "hidden",
@@ -168,13 +189,13 @@ const styles = StyleSheet.create({
   },
 
   signInCard: {
-    flex: 1,
     backgroundColor: "#fff",
-    marginTop: -60,
+    marginTop: -50,
     borderTopLeftRadius: 60,
     borderTopRightRadius: 60,
     paddingHorizontal: 24,
     paddingTop: 36,
+    // paddingBottom: 40,
     alignItems: "center",
   },
 

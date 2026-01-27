@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity, TextInput } from 'react-native';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -11,8 +11,12 @@ const CATEGORY_DATA = [
   { id: '5', title: 'UGC', icon: 'videocam-outline' },
 ];
 
-export default function HomeSearchSection() {
-  const [activeId, setActiveId] = useState('1');
+export default function HomeSearchSection({ activeCategory = '1', onTabChange }) {
+  const [activeId, setActiveId] = useState(activeCategory);
+
+  useEffect(() => {
+    setActiveId(activeCategory);
+  }, [activeCategory]);
 
   return (
     <LinearGradient
@@ -38,7 +42,12 @@ export default function HomeSearchSection() {
           return (
             <TouchableOpacity
               key={item.id}
-              onPress={() => setActiveId(item.id)}
+              onPress={() => {
+                setActiveId(item.id);
+                if (onTabChange) {
+                  onTabChange(item.id);
+                }
+              }}
               activeOpacity={0.8}
               style={{
                 alignItems: 'center',

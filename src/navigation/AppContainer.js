@@ -13,6 +13,7 @@ export default function AppContainer() {
         animation: "fade",
         animationDuration: 300,
       }}
+      initialRouteName="main"
     >
       <Stack.Screen name="auth" component={AuthScreen} />
       <Stack.Screen name="main" component={BottomTabs} />
